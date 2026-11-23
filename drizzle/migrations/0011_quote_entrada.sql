@@ -1,0 +1,2 @@
+ALTER TABLE public.quotes ADD COLUMN entrada numeric(12,2) NOT NULL DEFAULT 0 CHECK (entrada >= 0);
+COMMENT ON COLUMN public.quotes.entrada IS 'Valor de entrada pago pelo cliente; abatido do total para saldo/parcelas';
