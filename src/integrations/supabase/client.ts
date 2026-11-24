@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
+declare const __APP_SUPABASE_URL__: string | undefined;
+declare const __APP_SUPABASE_PUBLISHABLE_KEY__: string | undefined;
+
 function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith('sb_publishable_') || value.startsWith('sb_secret_');
 }
@@ -26,13 +29,23 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 function createSupabaseClient() {
+  const injectedUrl = typeof __APP_SUPABASE_URL__ !== 'undefined' ? __APP_SUPABASE_URL__ : '';
+  const injectedKey = typeof __APP_SUPABASE_PUBLISHABLE_KEY__ !== 'undefined' ? __APP_SUPABASE_PUBLISHABLE_KEY__ : '';
+
   const SUPABASE_URL =
-    import.meta.env['VITE_SUPABASE_URL'] ||
+    injectedUrl ||
+    import.meta.env.VITE_SUPABASE_URL ||
+    import.meta.env.NEXT_PUBLIC_SUPABASE_URL ||
     (typeof process !== 'undefined'
       ? process.env['SUPABASE_URL'] || process.env['NEXT_PUBLIC_SUPABASE_URL'] || process.env['VITE_SUPABASE_URL']
       : undefined);
+
   const SUPABASE_PUBLISHABLE_KEY =
-    import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'] ||
+    injectedKey ||
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    import.meta.env.VITE_SUPABASE_ANON_KEY ||
+    import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     (typeof process !== 'undefined'
       ? process.env['SUPABASE_PUBLISHABLE_KEY'] ||
         process.env['SUPABASE_ANON_KEY'] ||

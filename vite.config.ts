@@ -27,10 +27,11 @@ export default defineConfig(({ command, mode }) => {
     "";
 
   return {
+    envPrefix: ["VITE_", "NEXT_PUBLIC_"],
     define: {
-      ...(supabaseUrl ? { "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(supabaseUrl) } : {}),
-      ...(supabaseKey ? { "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(supabaseKey) } : {}),
-      ...(siteUrl ? { "import.meta.env.VITE_SITE_URL": JSON.stringify(siteUrl) } : {}),
+      __APP_SUPABASE_URL__: JSON.stringify(supabaseUrl),
+      __APP_SUPABASE_PUBLISHABLE_KEY__: JSON.stringify(supabaseKey),
+      __APP_SITE_URL__: JSON.stringify(siteUrl),
     },
     resolve: {
       alias: { "@": `${process.cwd()}/src` },
