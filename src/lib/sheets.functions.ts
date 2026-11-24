@@ -2,21 +2,21 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const SHEET_ID = "1huxhMTbeokws8sTU9W0LOw65vRRRt8DBhPh_nGqhw-8";
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_sheets/v4";
+const DEFAULT_SHEET_ID = "1huxhMTbeokws8sTU9W0LOw65vRRRt8DBhPh_nGqhw-8";
+const GOOGLE_SHEETS_API = "https://sheets.googleapis.com/v4";
 
 async function sheets(path: string, init?: RequestInit) {
-  const lovable = process.env["LOVABLE_API_KEY"];
-  const key = process.env["GOOGLE_SHEETS_API_KEY"];
-  if (!lovable || !key) throw new Error("Planilha não configurada");
-  const res = await fetch(`${GATEWAY_URL}/spreadsheets/${SHEET_ID}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${lovable}`,
-      "X-Connection-Api-Key": key,
-      "Content-Type": "application/json",
-    },
-  });
+  const sheetId = process.env["GOOGLE_SHEETS_ID"] || DEFAULT_SHEET_ID;
+  const accessToken = process.env["GOOGLE_SHEETS_ACCESS_TOKEN"];
+  const apiKey = process.env["GOOGLE_SHEETS_API_KEY"];
+  if (!accessToken && !apiKey) {
+    throw new Error("Planilha não configurada. Defina GOOGLE_SHEETS_ACCESS_TOKEN ou GOOGLE_SHEETS_API_KEY na Vercel.");
+  }
+  const sep = path.includes("?") ? "&" : "?";
+  const url = `${GOOGLE_SHEETS_API}/spreadsheets/${sheetId}${path}${!accessToken && apiKey ? `${sep}key=${encodeURIComponent(apiKey)}` : ""}`;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+  const res = await fetch(url, { ...init, headers });
   if (!res.ok) {
     const body = await res.text();
     console.error(`Sheets error [${res.status}]: ${body}`);
@@ -71,11 +71,23 @@ export const listProducts = createServerFn({ method: "GET" }).middleware([requir
   }));
 });
 
+const safePhotoRef = z
+  .string()
+  .max(60000)
+  .refine(
+    (v) =>
+      v === "" ||
+      v.startsWith("sb:") ||
+      /^https:\/\/[^\s]+$/i.test(v) ||
+      /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=\s]+$/i.test(v),
+    "Referência de foto inválida",
+  );
+
 const productSchema = z.object({
   row: z.number().int().min(2).optional(),
   modelo: z.string().min(1).max(200), variacao: z.string().max(200),
   custo: z.number(), venda: z.number(), estoque: z.number().int(),
-  foto: z.string().max(60000),
+  foto: safePhotoRef,
   lucroTipo: z.enum(["fixo", "margem"]), lucro: z.number(), categoria: z.string().max(100).default(""), categoriaPai: z.string().max(100).default(""), destaque: z.boolean().optional(),
   fromImport: z.boolean().optional(),
   previousCusto: z.number().optional(),

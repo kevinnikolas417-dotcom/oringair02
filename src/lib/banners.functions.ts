@@ -30,9 +30,14 @@ export const listBannersAdmin = createServerFn({ method: "GET" }).middleware([re
     return { banners: (b ?? []).map((x: AdminBanner) => ({ ...x, preview: photoUrl(x.imagem_url, m) })), sellers: s ?? [] };
   });
 
+const safeBannerImg = z
+  .string()
+  .max(2000)
+  .refine((v) => v === "" || v.startsWith("sb:") || /^https:\/\/[^\s]+$/i.test(v), "URL de imagem inválida");
+
 const bannerSchema = z.object({
   id: z.string().uuid().optional(), vendedor_id: z.string().uuid().nullable(),
-  imagem_url: z.string().max(2000), titulo: z.string().max(120), subtitulo: z.string().max(200),
+  imagem_url: safeBannerImg, titulo: z.string().max(120), subtitulo: z.string().max(200),
   link_tipo: z.enum(["categoria", "produto", "url", "nenhum"]), link_valor: z.string().max(500),
   ativo: z.boolean(), inicio: z.string().nullable(), fim: z.string().nullable(), ordem: z.number().int().optional(),
 });

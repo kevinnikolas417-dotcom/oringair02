@@ -56,42 +56,17 @@ const classifySchema = {
 };
 
 async function classify(produto: string, items: { titulo: string; condicao: string }[]) {
-  const key = process.env["LOVABLE_API_KEY"];
-  if (!key) throw new Error("IA não configurada");
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, "Lovable-API-Key": key, "X-Lovable-AIG-SDK": "fetch" },
-    body: JSON.stringify({
-      model: "openai/gpt-6-astra", stream: true, store: false, reasoning: { effort: "low" },
-      instructions: `Você classifica ofertas do Google Shopping. Para cada oferta diga: mesmo_modelo = true só se for exatamente o mesmo modelo E o mesmo armazenamento do produto de referência (cor não importa); condicao (novo, usado, cpo = recondicionado/seminovo certificado, vitrine = mostruário/open box); acessorio = true se for capa, película, tela, bateria, peça, cabo ou qualquer item que não seja o aparelho.`,
-      input: `Produto de referência: ${produto}\n\nOfertas:\n${items.map((x, i) => `${i}. ${x.titulo}${x.condicao ? ` [${x.condicao}]` : ""}`).join("\n")}`,
-      text: { format: { type: "json_schema", name: "ofertas", strict: true, schema: classifySchema } },
-    }),
+  const { callStructuredAi } = await import("./ai.server");
+  const parsed = await callStructuredAi<{
+    itens: { i: number; mesmo_modelo: boolean; condicao: string; acessorio: boolean }[];
+  }>({
+    instructions: `Você classifica ofertas do Google Shopping. Para cada oferta diga: mesmo_modelo = true só se for exatamente o mesmo modelo E o mesmo armazenamento do produto de referência (cor não importa); condicao (novo, usado, cpo = recondicionado/seminovo certificado, vitrine = mostruário/open box); acessorio = true se for capa, película, tela, bateria, peça, cabo ou qualquer item que não seja o aparelho.`,
+    input: `Produto de referência: ${produto}\n\nOfertas:\n${items.map((x, i) => `${i}. ${x.titulo}${x.condicao ? ` [${x.condicao}]` : ""}`).join("\n")}`,
+    schemaName: "ofertas",
+    schema: classifySchema,
+    errorLabel: "A IA não conseguiu classificar as ofertas",
   });
-  if (!res.ok || !res.body) {
-    console.error(`AI error [${res.status}]: ${await res.text()}`);
-    if (res.status === 429) throw new Error("Muitas solicitações à IA. Aguarde e tente de novo.");
-    if (res.status === 402) throw new Error("Créditos de IA esgotados. Adicione créditos no workspace.");
-    throw new Error(`Erro na IA [${res.status}]`);
-  }
-  const reader = res.body.getReader(); const dec = new TextDecoder();
-  let buf = "", out = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
-    let i;
-    while ((i = buf.indexOf("\n")) >= 0) {
-      const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
-      if (!line.startsWith("data:")) continue;
-      const p = line.slice(5).trim();
-      if (!p || p === "[DONE]") continue;
-      let ev; try { ev = JSON.parse(p); } catch { continue; }
-      if (ev.type === "response.output_text.delta") out += ev.delta ?? "";
-      if (ev.type === "response.failed" || ev.type === "error") throw new Error("A IA não conseguiu classificar as ofertas");
-    }
-  }
-  return (JSON.parse(out) as { itens: { i: number; mesmo_modelo: boolean; condicao: string; acessorio: boolean }[] }).itens;
+  return parsed.itens ?? [];
 }
 
 export const analyzeProduct = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
@@ -110,7 +85,11 @@ export const analyzeProduct = createServerFn({ method: "POST" }).middleware([req
     if (!res.ok) { const t = await res.text(); console.error(`SerpApi [${res.status}]: ${t}`); throw new Error(`Erro na busca de preços [${res.status}]`); }
     const json = await res.json() as { shopping_results?: { title?: string; source?: string; extracted_price?: number; product_link?: string; link?: string; second_hand_condition?: string }[] };
     const raw = (json.shopping_results ?? []).filter((x) => x.title && Number(x.extracted_price) > 0).slice(0, 30)
-      .map((x) => ({ loja: x.source ?? "", titulo: x.title!, preco: Number(x.extracted_price), link: x.product_link ?? x.link ?? "", condicao: x.second_hand_condition ?? "" }));
+      .map((x) => {
+        const candidateLink = x.product_link ?? x.link ?? "";
+        const safeLink = /^https?:\/\//i.test(candidateLink) ? candidateLink : "";
+        return { loja: x.source ?? "", titulo: x.title!, preco: Number(x.extracted_price), link: safeLink, condicao: x.second_hand_condition ?? "" };
+      });
     let ofertas: RadarOffer[] = [];
     if (raw.length) {
       const cls = await classify(p.modelo, raw);

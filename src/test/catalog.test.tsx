@@ -4,8 +4,16 @@ import { Catalog } from "@/components/Catalog";
 import type { Product } from "@/lib/sheets.functions";
 
 const save = vi.hoisted(() => vi.fn().mockResolvedValue({ ok: true }));
-vi.mock("@tanstack/react-start", () => ({ useServerFn: () => save }));
-vi.mock("@/lib/sheets.functions", () => ({ saveProduct: {}, deleteProduct: {} }));
+const saveProductRef = vi.hoisted(() => ({ __mock: "saveProduct" }));
+vi.mock("@tanstack/react-start", () => ({
+  useServerFn: (fn: unknown) => (fn === saveProductRef ? save : vi.fn().mockResolvedValue({ pai: [], sub: [] })),
+  createMiddleware: () => ({ server: (fn: unknown) => fn }),
+  createServerFn: () => {
+    const chain = { middleware: () => chain, inputValidator: () => chain, handler: (fn: unknown) => fn };
+    return chain;
+  },
+}));
+vi.mock("@/lib/sheets.functions", () => ({ saveProduct: saveProductRef, deleteProduct: {} }));
 vi.mock("@/lib/import.functions", () => ({ parseSupplierList: {}, listProductAliases: {}, saveImportMetadata: {} }));
 vi.mock("@/lib/images.functions", () => ({ findProductImages: {}, saveLibraryImage: {} }));
 const products: Product[] = Array.from({ length: 25 }, (_, i) => ({ row: i + 2, modelo: `Aparelho ${i + 1}`, variacao: "", custo: 100, venda: 200, estoque: 1, foto: "", fotoRef: "", lucroTipo: "fixo", lucro: 50, categoria: i < 10 ? "iPhone" : "Samsung", categoriaPai: "", destaque: false, variants: [] }));

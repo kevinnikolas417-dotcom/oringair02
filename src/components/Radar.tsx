@@ -180,7 +180,7 @@ export function Radar({ products, onChanged }: { products: Product[]; onChanged:
               {(d.r?.ofertas ?? []).map((o, i) => (
                 <li key={i} className="flex items-center justify-between gap-2 rounded-lg bg-ground p-2">
                   <span className="min-w-0"><span className="font-medium">{o.loja || "Loja"}</span>{o.suspeito && <span className="ml-1 rounded bg-destructive/10 px-1 text-[10px] text-destructive">suspeito</span>}<span className="block truncate text-[11px] text-dim">{o.titulo}</span></span>
-                  <span className="flex shrink-0 items-center gap-2"><span className="tabular-nums">{brl(o.preco)}</span>{o.link && <a className="text-xs text-acid underline" href={o.link} target="_blank" rel="noreferrer">abrir</a>}</span>
+                  <span className="flex shrink-0 items-center gap-2"><span className="tabular-nums">{brl(o.preco)}</span>{o.link && /^https?:\/\//i.test(o.link) && <a className="text-xs text-acid underline" href={o.link} target="_blank" rel="noopener noreferrer">abrir</a>}</span>
                 </li>
               ))}
               {!d.r?.ofertas.length && <li className="text-xs text-dim">Nenhuma oferta válida.</li>}

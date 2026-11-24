@@ -99,6 +99,13 @@
       "when": 1795456500000,
       "tag": "0013_product_recognition",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795556500000,
+      "tag": "0014_security_hardening",
+      "breakpoints": true
     }
   ]
 }

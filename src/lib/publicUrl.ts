@@ -1,11 +1,22 @@
-// Base pública para links compartilháveis (vitrine, orçamentos).
-// O endereço de pré-visualização do Lovable exige login; links enviados a
-// clientes devem sempre apontar para o site publicado.
-const PUBLISHED_ORIGIN = "https://pixel-perfect-render-40934.lovable.app";
-
+// Base pública para links compartilháveis (vitrine, orçamentos e redefinição de senha).
+// Prioriza VITE_SITE_URL (configurado na Vercel), seguido pela origem atual do navegador
+// ou pelo domínio de produção da Vercel no SSR.
 export function publicOrigin(): string {
-  if (typeof window === "undefined") return PUBLISHED_ORIGIN;
-  const host = window.location.host;
-  if (host.includes("localhost") || host.startsWith("id-preview--")) return PUBLISHED_ORIGIN;
-  return window.location.origin;
+  const configured = (import.meta.env["VITE_SITE_URL"] as string | undefined)?.trim().replace(/\/+$/, "");
+  if (configured) return configured;
+
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+
+  if (typeof process !== "undefined") {
+    const vercelHost =
+      process.env["VERCEL_PROJECT_PRODUCTION_URL"] ||
+      process.env["VERCEL_URL"];
+    if (vercelHost) {
+      return vercelHost.startsWith("http") ? vercelHost.replace(/\/+$/, "") : `https://${vercelHost.replace(/\/+$/, "")}`;
+    }
+  }
+
+  return "";
 }

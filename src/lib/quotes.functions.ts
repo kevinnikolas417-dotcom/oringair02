@@ -82,8 +82,9 @@ export const setQuoteStatus = createServerFn({ method: "POST" }).middleware([req
   .inputValidator((d) => z.object({ id: z.string().uuid(), status: z.enum(["enviado", "aceito"]) }).parse(d))
   .handler(async ({ data, context }) => {
     const ctx = context as unknown as Ctx;
-    const { error } = await ctx.supabase.from("quotes").update({ status: data.status }).eq("id", data.id);
+    const { data: updated, error } = await ctx.supabase.from("quotes").update({ status: data.status }).eq("id", data.id).select("id").maybeSingle();
     if (error) throw new Error(error.message);
+    if (!updated) throw new Error("Orçamento não encontrado ou sem permissão");
     return { ok: true };
   });
 
@@ -134,6 +135,14 @@ export const acceptPublicQuote = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const today = new Date().toISOString().slice(0, 10);
-    await supabaseAdmin.from("quotes").update({ status: "aceito" }).eq("id", data.id).gte("validade", today);
-    return { ok: true };
+    const { data: updated, error } = await supabaseAdmin
+      .from("quotes")
+      .update({ status: "aceito" })
+      .eq("id", data.id)
+      .eq("status", "enviado")
+      .gte("validade", today)
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error("Erro ao aceitar orçamento");
+    return { ok: !!updated };
   });

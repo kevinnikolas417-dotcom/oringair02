@@ -1,29 +1,34 @@
-# Welcome to your Lovable project
+# Gestão & Precificação Pro
 
-This project was built with [Lovable](https://lovable.dev).
+Painel de gestão, precificação, catálogo de produtos, vitrine de vendedores, orçamentos, importação inteligente de listas de fornecedores e radar de preços.
 
-## Build with Lovable
+## Stack
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+- **Framework:** TanStack Start + React 19 + TypeScript
+- **Estilos:** Tailwind CSS v4 + Radix UI
+- **Banco de Dados & Auth:** Supabase (PostgreSQL + RLS + Storage)
+- **Deploy:** Vercel (via Nitro preset `vercel`)
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+## Desenvolvimento Local
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+npm install
+cp .env.example .env
 npm run dev
 ```
 
-## Built with
+## Deploy na Vercel
 
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+1. Importe este repositório na Vercel.
+2. Configure as variáveis de ambiente listadas em `.env.example` nas configurações do projeto na Vercel.
+3. No painel do Supabase (**Authentication → URL Configuration**):
+   - Defina **Site URL** como o domínio do site na Vercel (ex.: `https://seu-projeto.vercel.app`).
+   - Adicione `https://seu-projeto.vercel.app/reset-password` em **Redirect URLs**.
+4. Aplique as migrations SQL da pasta `drizzle/migrations/` no banco Supabase.
+
+## Scripts
+
+- `npm run dev` — inicia o servidor de desenvolvimento
+- `npm run build` — gera o build de produção para a Vercel
+- `npm test` — executa os testes unitários (Vitest)
+- `npm run lint` — executa o ESLint

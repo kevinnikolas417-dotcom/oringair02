@@ -50,53 +50,19 @@ export const parseSupplierList = createServerFn({ method: "POST" }).middleware([
   }).parse(d))
   .handler(async ({ data, context }): Promise<ParsedItem[]> => {
     await assertAdmin(context);
-    const key = process.env["LOVABLE_API_KEY"];
-    if (!key) throw new Error("IA não configurada");
     const modelosHint = data.modelosExistentes?.length
       ? `\nModelos já cadastrados no banco (prefira manter exatamente estes nomes quando o item da lista for o mesmo produto): ${data.modelosExistentes.slice(0, 250).join(" | ")}`
       : "";
+    const { callStructuredAi } = await import("./ai.server");
     // The original message is only sent to the model; it is never stored.
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, "Lovable-API-Key": key, "X-Lovable-AIG-SDK": "fetch" },
-      body: JSON.stringify({
-        model: "openai/gpt-6-astra", stream: true, store: false, reasoning: { effort: "low" },
-        instructions: rules,
-        input: `Categorias existentes: ${data.categorias.join(", ") || "(nenhuma)"}\nSubcategorias existentes: ${data.subcategorias.join(", ") || "(nenhuma)"}${modelosHint}\n\nLISTA:\n${data.texto}`,
-        text: { format: { type: "json_schema", name: "lista", strict: true, schema } },
-      }),
+    const parsed = await callStructuredAi<{ itens: ParsedItem[] }>({
+      instructions: rules,
+      input: `Categorias existentes: ${data.categorias.join(", ") || "(nenhuma)"}\nSubcategorias existentes: ${data.subcategorias.join(", ") || "(nenhuma)"}${modelosHint}\n\nLISTA:\n${data.texto}`,
+      schemaName: "lista",
+      schema,
+      errorLabel: "A IA não retornou uma lista válida",
     });
-    if (!res.ok || !res.body) {
-      const body = await res.text();
-      console.error(`AI error [${res.status}]: ${body}`);
-      if (res.status === 429) throw new Error("Muitas solicitações à IA. Aguarde um pouco e tente de novo.");
-      if (res.status === 402) throw new Error("Créditos de IA esgotados. Adicione créditos no workspace.");
-      throw new Error(`Erro na IA [${res.status}]`);
-    }
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "", out = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      let i;
-      while ((i = buf.indexOf("\n")) >= 0) {
-        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
-        if (!line.startsWith("data:")) continue;
-        const p = line.slice(5).trim();
-        if (!p || p === "[DONE]") continue;
-        try {
-          const ev = JSON.parse(p);
-          if (ev.type === "response.output_text.delta") out += ev.delta ?? "";
-          if (ev.type === "response.failed" || ev.type === "error") throw new Error("A IA não conseguiu ler a lista");
-        } catch (e) { if (e instanceof Error && e.message.startsWith("A IA")) throw e; }
-      }
-    }
-    try {
-      const itens = (JSON.parse(out) as { itens: ParsedItem[] }).itens;
-      return itens.filter((x) => x.nome && x.custo > 0);
-    } catch { throw new Error("A IA não retornou uma lista válida"); }
+    return (parsed.itens ?? []).filter((x) => x.nome && x.custo > 0);
   });
 
 export const listProductAliases = createServerFn({ method: "GET" }).middleware([requireSupabaseAuth])

@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { publicOrigin } from "@/lib/publicUrl";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -16,7 +17,7 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-type Mode = "login" | "signup" | "forgot";
+type Mode = "login" | "forgot";
 
 function AuthPage() {
   const navigate = useNavigate();
@@ -41,14 +42,11 @@ function AuthPage() {
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-      } else if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
-        if (error) throw error;
-        setMsg({ ok: true, text: "Conta criada! Confirme pelo link enviado ao seu e-mail para entrar." });
       } else {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
+        const origin = publicOrigin() || window.location.origin;
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${origin}/reset-password` });
         if (error) throw error;
-        setMsg({ ok: true, text: "Enviamos um link para redefinir sua senha." });
+        setMsg({ ok: true, text: "Enviamos um link para redefinir sua senha no seu e-mail." });
       }
     } catch (err) {
       const t = err instanceof Error ? err.message : "Erro";
@@ -57,7 +55,7 @@ function AuthPage() {
     setBusy(false);
   };
 
-  const titles = { login: "Entrar", signup: "Criar conta", forgot: "Esqueci minha senha" };
+  const titles = { login: "Entrar", forgot: "Esqueci minha senha" };
 
   return (
     <div className="gridbg grid min-h-screen place-items-center bg-ground px-4 text-ink">
@@ -72,18 +70,21 @@ function AuthPage() {
         <form onSubmit={submit} className="grid gap-3 p-5">
           <label><span className="label-mono">E-mail</span>
             <input className="field" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-          {mode !== "forgot" && (
+          {mode === "login" && (
             <label><span className="label-mono">Senha</span>
-              <input className="field" type="password" required minLength={6} autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+              <input className="field" type="password" required minLength={6} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
           )}
           {msg && <p className={`font-mono text-[11px] ${msg.ok ? "text-acid" : "text-destructive"}`}>{msg.text}</p>}
-          <button disabled={busy} className="btn-acid mt-1">{busy ? "Aguarde…" : mode === "login" ? "Entrar" : mode === "signup" ? "Criar conta" : "Enviar link"}</button>
+          <button disabled={busy} className="btn-acid mt-1">{busy ? "Aguarde…" : mode === "login" ? "Entrar" : "Enviar link"}</button>
           <div className="mt-2 flex flex-col items-center gap-1.5 font-mono text-[11px] text-dim">
-            {mode === "login" && <>
-              <button type="button" className="hover:text-acid" onClick={() => { setMode("forgot"); setMsg(null); }}>Esqueci minha senha</button>
-              <span>Acesso criado pelo administrador</span>
-            </>}
-            {mode !== "login" && <button type="button" className="hover:text-acid" onClick={() => { setMode("login"); setMsg(null); }}>Voltar para entrar</button>}
+            {mode === "login" ? (
+              <>
+                <button type="button" className="hover:text-acid" onClick={() => { setMode("forgot"); setMsg(null); }}>Esqueci minha senha</button>
+                <span>Acesso criado pelo administrador</span>
+              </>
+            ) : (
+              <button type="button" className="hover:text-acid" onClick={() => { setMode("login"); setMsg(null); }}>Voltar para entrar</button>
+            )}
           </div>
         </form>
       </div>

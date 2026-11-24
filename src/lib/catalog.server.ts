@@ -1,4 +1,4 @@
-// Server-only product store (Lovable Cloud database + private photo storage).
+// Server-only product store (Supabase database + private photo storage).
 // Photos are stored as "sb:<path>" (storage object) or a legacy data: URL and resolved to signed URLs here.
 export const PHOTO_BUCKET = "product-photos";
 const PHOTO_TTL = 60 * 60 * 24 * 7; // 7 days

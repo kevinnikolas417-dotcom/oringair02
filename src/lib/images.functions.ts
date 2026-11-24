@@ -12,6 +12,39 @@ async function assertAdmin(ctx: Ctx) {
   if (!data) throw new Error("Acesso restrito ao administrador");
 }
 
+// Blocks SSRF targets (loopback, link-local, RFC1918 private IPs, metadata hosts, credentials, non-443 ports).
+function isSafePublicImageUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "https:") return false;
+    if (u.username || u.password) return false;
+    if (u.port && u.port !== "443") return false;
+    const host = u.hostname.toLowerCase();
+    if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) {
+      return false;
+    }
+    if (host.startsWith("[") || host.includes(":")) return false; // block raw IPv6 literals
+    const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+    if (ipv4) {
+      const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+      if (
+        a === 0 ||
+        a === 10 ||
+        a === 127 ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168) ||
+        (a === 100 && b >= 64 && b <= 127)
+      ) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Searches one image per item (model + color) unless the image library already has it.
 // Never throws per item: failures return null so the import keeps going.
 export const findProductImages = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
@@ -38,11 +71,12 @@ export const findProductImages = createServerFn({ method: "POST" }).middleware([
         if (!res.ok) { console.error(`Image search failed [${res.status}]: ${await res.text()}`); return null; }
         const imgs = ((await res.json()).images ?? []) as { imageUrl?: string }[];
         for (const c of imgs.slice(0, 5)) {
-          if (!c.imageUrl?.startsWith("https://")) continue;
+          if (!c.imageUrl || !isSafePublicImageUrl(c.imageUrl)) continue;
           try {
-            const r = await fetch(c.imageUrl, { signal: AbortSignal.timeout(8000) });
+            const r = await fetch(c.imageUrl, { signal: AbortSignal.timeout(8000), redirect: "error" });
             const type = r.headers.get("content-type") ?? "";
-            if (!r.ok || !/^image\/(jpeg|png|webp)/.test(type)) continue;
+            const len = Number(r.headers.get("content-length") ?? "0");
+            if (!r.ok || !/^image\/(jpeg|png|webp)/.test(type) || (len > 5_000_000)) continue;
             const buf = await r.arrayBuffer();
             if (buf.byteLength < 5000 || buf.byteLength > 5_000_000) continue;
             const path = `auto/${crypto.randomUUID()}.${type.includes("png") ? "png" : type.includes("webp") ? "webp" : "jpg"}`;
