@@ -37,6 +37,9 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
+  const detail = error instanceof Error && error.message.includes("Missing Supabase")
+    ? "Variáveis do Supabase não configuradas na Vercel (VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY)."
+    : null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -45,7 +48,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
           Não foi possível carregar esta página
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Ocorreu um erro inesperado. Você pode tentar novamente ou voltar para o início.
+          {detail ?? "Ocorreu um erro inesperado. Você pode tentar novamente ou voltar para o início."}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
